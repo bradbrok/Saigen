@@ -17,6 +17,7 @@ export type ComponentKind =
   | 'nMosfet'
   | 'pMosfet'
   | 'opAmp'
+  | 'tl072'
   | 'comparator'
   | 'ssi2131'
   | 'ssi2144'
@@ -29,6 +30,8 @@ export type ComponentKind =
   | 'attenuverter'
   | 'audioOutput'
   | 'plus12V'
+  | 'plus5V'
+  | 'vref2V5'
   | 'minus12V'
   | 'ground'
   | 'probe'
@@ -55,6 +58,8 @@ export interface ComponentPort {
   pinNumber?: string
   /** Implicit connection used only when this pin has no explicit wire. */
   defaultNet?: DefaultNet
+  /** Mark as intentionally open in KiCad unless the user explicitly connects it. */
+  defaultNoConnect?: boolean
 }
 
 export interface CatalogComponent {
@@ -79,6 +84,8 @@ export interface CircuitComponent {
   label: string
   position: Point
   value?: string
+  /** Explicit KiCad library footprint override, e.g. `Resistor_SMD:R_0603_1608Metric`. */
+  footprint?: string
   parameters: Record<string, number>
 }
 

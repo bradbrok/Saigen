@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { editorPin, physicalPinCount, ssiDevices } from './devices'
+import { catalogByKind } from '../circuit/catalog'
+import { editorPin, physicalPinCount, ssiDeviceByKind, ssiDevices, tl072Device } from './devices'
 
 describe('SSI KiCad device library', () => {
   it.each(ssiDevices)('$value has one identity-mapped definition for every package pin', (device) => {
@@ -11,12 +12,18 @@ describe('SSI KiCad device library', () => {
     expect(new Set(numbers).size).toBe(16)
   })
 
-  it.each(ssiDevices)('$value maps each compact editor port to exactly one physical pin', (device) => {
+  it.each(ssiDevices)('$value exposes every physical pin exactly once on the canvas', (device) => {
     const editorPorts = device.units.flatMap((unit) => unit.pins)
       .flatMap((pin) => pin.editorPortId ? [pin.editorPortId] : [])
+    const catalogPorts = catalogByKind[device.kind].ports.map((port) => port.id)
 
     expect(new Set(editorPorts).size).toBe(editorPorts.length)
-    for (const portId of editorPorts) expect(editorPin(device, portId)?.pin.editorPortId).toBe(portId)
+    expect(editorPorts).toHaveLength(16)
+    expect(new Set(editorPorts)).toEqual(new Set(catalogPorts))
+    for (const port of catalogByKind[device.kind].ports) {
+      expect(editorPin(device, port.id)?.pin.editorPortId).toBe(port.id)
+      expect(editorPin(device, port.id)?.pin.number).toBe(port.pinNumber)
+    }
   })
 
   it('uses the four VCA cells plus an explicit power/mode unit for SSI2164', () => {
@@ -28,5 +35,21 @@ describe('SSI KiCad device library', () => {
       'VCA 4',
       'Power / Mode',
     ])
+    expect(device?.units.slice(0, 4).map((unit) => unit.pins.find((pin) => pin.name.startsWith('IOUT'))?.electricalType))
+      .toEqual(['passive', 'passive', 'passive', 'passive'])
+    expect(device?.units.slice(0, 4).map((unit) => unit.pins.find((pin) => pin.name.startsWith('VC '))?.electricalType))
+      .toEqual(['input', 'input', 'input', 'input'])
+  })
+
+  it('defines TL072 as two amplifiers and a shared power unit in one SOIC-8 package', () => {
+    expect(ssiDeviceByKind.tl072).toBe(tl072Device)
+    expect(tl072Device.footprint).toBe('Package_SO:SOIC-8_3.9x4.9mm_P1.27mm')
+    expect(tl072Device.units.map((unit) => unit.name)).toEqual(['Amplifier A', 'Amplifier B', 'Power'])
+    expect(physicalPinCount(tl072Device)).toBe(8)
+    expect(new Set(tl072Device.units.flatMap((unit) => unit.pins.map((pin) => pin.editorPortId))))
+      .toEqual(new Set(catalogByKind.tl072.ports.map((port) => port.id)))
+    for (const port of catalogByKind.tl072.ports) {
+      expect(editorPin(tl072Device, port.id)?.pin.number).toBe(port.pinNumber)
+    }
   })
 })

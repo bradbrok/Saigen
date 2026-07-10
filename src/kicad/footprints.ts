@@ -10,7 +10,6 @@ interface GullWingFootprintOptions {
   name: string
   description: string
   tags: string
-  model: string
   bodyWidth: number
   bodyLength: number
   padRowX: number
@@ -137,10 +136,6 @@ ${fab.join('\n')}
   (fp_text user "\${REFERENCE}" (at 0 0 90) (layer "F.Fab")
     (effects (font (size 1 1) (thickness 0.15))))
 ${pads(options).join('\n')}
-  (model "${options.model}"
-    (offset (xyz 0 0 0))
-    (scale (xyz 1 1 1))
-    (rotate (xyz 0 0 0)))
 )
 `
 }
@@ -149,7 +144,6 @@ const psl16 = footprint({
   name: SSI_PSL16_FOOTPRINT_NAME,
   description: 'Sound Semiconductor PSL16 16-lead SOP, JEDEC MS-012-AC; nominal body 3.9 x 9.9 mm, 1.27 mm pitch; package drawing https://www.soundsemiconductor.com/downloads/PODPSL16.pdf',
   tags: 'SSI PSL16 SOP SOIC-16 MS-012-AC 1.27mm',
-  model: '${KICAD10_3DMODEL_DIR}/Package_SO.3dshapes/SOIC-16_3.9x9.9mm_P1.27mm.step',
   bodyWidth: 3.9,
   bodyLength: 9.9,
   padRowX: 2.475,
@@ -166,7 +160,6 @@ const pssl16 = footprint({
   name: SSI_PSSL16_FOOTPRINT_NAME,
   description: 'Sound Semiconductor PSSL16 16-lead SSOP, JEDEC MO-137-AB; nominal body 3.9 x 4.9 mm, 0.635 mm pitch; package drawing https://www.soundsemiconductor.com/downloads/PODPSSL16.pdf',
   tags: 'SSI PSSL16 SSOP-16 MO-137-AB 0.635mm',
-  model: '${KICAD10_3DMODEL_DIR}/Package_SO.3dshapes/SSOP-16_3.9x4.9mm_P0.635mm.step',
   bodyWidth: 3.9,
   bodyLength: 4.9,
   padRowX: 2.625,

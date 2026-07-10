@@ -47,10 +47,10 @@ function ComponentBody({ component }: { component: CircuitComponent }): ReactNod
 
   if (component.kind.startsWith('ssi')) {
     const waveform = component.kind === 'ssi2131'
-      ? `M22 ${height - 31} l10 -11 10 22 10 -22 10 22 10 -11`
+      ? `M72 ${height - 49} l14 -15 14 30 14 -30 14 30 14 -15`
       : component.kind === 'ssi2144'
-        ? `M22 ${height - 21} C34 ${height - 45}, 55 ${height - 5}, 77 ${height - 28} S112 ${height - 26}, 126 ${height - 36}`
-        : `M25 ${height - 30} h18 l7 -10 7 20 7 -20 7 20 h25`
+        ? `M54 ${height - 38} C78 ${height - 72}, 111 ${height - 8}, 146 ${height - 46} S190 ${height - 44}, 204 ${height - 58}`
+        : `M70 ${height - 49} h25 l10 -14 10 28 10 -28 10 28 h38`
 
     return (
       <>
@@ -61,8 +61,8 @@ function ComponentBody({ component }: { component: CircuitComponent }): ReactNod
         <text className="symbol-reference" x="16" y="25">{component.reference}</text>
         <text className="ic-model" x="16" y="54" fill={color}>{catalog.shortName}</text>
         <text className="ic-function" x="16" y="75">{component.label}</text>
+        <text className="model-chip" x={width - 16} y="102" textAnchor="end">FULL 16-PIN DEVICE</text>
         <path className="ic-waveform" d={waveform} stroke={color} />
-        <text className="model-chip" x={width - 15} y={height - 13} textAnchor="end">BEHAVIORAL</text>
       </>
     )
   }
@@ -189,6 +189,27 @@ function ComponentBody({ component }: { component: CircuitComponent }): ReactNod
     )
   }
 
+  if (component.kind === 'tl072') {
+    return (
+      <>
+        <rect className="symbol-shadow" x="1" y="3" width={width} height={height} rx="9" />
+        <rect className="utility-panel" width={width} height={height} rx="9" />
+        <rect width={width} height="4" rx="2" fill={color} />
+        <text className="symbol-reference" x="14" y="22">{component.reference}</text>
+        <text className="ic-model" x={width - 14} y="22" textAnchor="end" fill={color}>TL072</text>
+        <path className="utility-body" d="M54 38v56l74-28Z" />
+        <text className="op-sign" x="59" y="57">+</text>
+        <text className="op-sign" x="59" y="87">−</text>
+        <text className="utility-label" x="94" y="70" textAnchor="middle">A</text>
+        <path className="utility-body" d="M54 108v56l74-28Z" />
+        <text className="op-sign" x="59" y="127">+</text>
+        <text className="op-sign" x="59" y="157">−</text>
+        <text className="utility-label" x="94" y="140" textAnchor="middle">B</text>
+        <text className="model-chip" x={width - 14} y={height - 12} textAnchor="end">DUAL JFET OP AMP · 8 PIN</text>
+      </>
+    )
+  }
+
   if (component.kind === 'comparator') {
     return (
       <>
@@ -202,17 +223,36 @@ function ComponentBody({ component }: { component: CircuitComponent }): ReactNod
     )
   }
 
-  if (component.kind === 'plus12V' || component.kind === 'minus12V') {
-    const isPositive = component.kind === 'plus12V'
+  if (
+    component.kind === 'plus12V' ||
+    component.kind === 'plus5V' ||
+    component.kind === 'vref2V5' ||
+    component.kind === 'minus12V'
+  ) {
+    const centerX = width / 2
+    const isNegative = component.kind === 'minus12V'
+    const isReference = component.kind === 'vref2V5'
+    const label = component.kind === 'plus12V'
+      ? '+12V'
+      : component.kind === 'plus5V'
+        ? '+5V'
+        : component.kind === 'vref2V5'
+          ? '2V5 REF'
+          : '−12V'
+    const glyph = isNegative
+      ? `M${centerX} 54V24m-18 0h36m-27-9h18`
+      : isReference
+        ? `M${centerX} 54V32m0 0-12-10 12-10 12 10Z`
+        : `M${centerX} 54V22m0 0-13 14m13-14 13 14`
     return (
       <>
         <path
           className="passive-line"
-          d={isPositive ? 'M36 54V22m0 0L23 36m13-14 13 14' : 'M36 54V24m-18 0h36m-27-9h18'}
+          d={glyph}
           style={{ stroke: color }}
         />
-        <text className="passive-value" x="36" y="9" textAnchor="middle">{isPositive ? '+12V' : '−12V'}</text>
-        <text className="symbol-reference" x="36" y="49" textAnchor="middle">{component.reference}</text>
+        <text className="passive-value" x={centerX} y="9" textAnchor="middle">{label}</text>
+        {!isReference && <text className="symbol-reference" x={centerX} y="49" textAnchor="middle">{component.reference}</text>}
       </>
     )
   }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { demoCircuit } from '../circuit/demo'
+import { instantiateCircuitTemplate, type CircuitTemplateId } from '../circuit/templates'
+import type { CircuitDocument } from '../circuit/types'
+import { exportKicadSchematic, importKicadSchematic } from './adapter'
 import { parseSExpressions } from './sexpr'
 import { createKicadProjectFiles, exportKicadProjectBundle } from './project'
 
@@ -49,6 +52,68 @@ describe('KiCad project bundle', () => {
     const notes = createKicadProjectFiles(demoCircuit).find((file) => file.path === 'DESIGN-NOTES.md')?.content
     expect(notes).toContain('Every SSI package pin is present exactly once')
     expect(notes).toContain('SSI2131 pin 16 requires regulated +5 V')
+    expect(notes).toContain('SSI2164 MODE is explicitly marked no-connect')
+    expect(notes).toContain('assign jack/header footprints')
+    expect(notes).toContain('bare generic parts remain unassigned')
+    expect(notes).toContain('omit version-specific 3D-model paths')
     expect(notes).toContain('Run KiCad ERC')
+  })
+
+  it.each([
+    ['ssi2131-typical', '16/16'],
+    ['ssi2144-typical', '16/16'],
+    ['ssi2164-typical', '15/16'],
+  ] as const)('round-trips the expanded %s application graph and reports physical-pin coverage', (id, coverage) => {
+    const base: CircuitDocument = {
+      schemaVersion: 1,
+      id: `project-${id}`,
+      title: id,
+      description: 'Expanded application template',
+      revision: 1,
+      components: [],
+      connections: [],
+    }
+    const instance = instantiateCircuitTemplate(base, id as CircuitTemplateId, { x: 40, y: 40 })
+    const document = {
+      ...base,
+      components: instance.components,
+      connections: instance.connections,
+    }
+    const source = exportKicadSchematic(document)
+    const imported = importKicadSchematic(source).document
+    const notes = createKicadProjectFiles(document).find((file) => file.path === 'DESIGN-NOTES.md')?.content
+
+    expect(imported.components).toHaveLength(document.components.length)
+    expect(imported.connections).toHaveLength(document.connections.length)
+    expect(source).toContain('(property "Footprint" "Resistor_SMD:R_0603_1608Metric"')
+    expect(source).toContain('(property "Footprint" "Capacitor_SMD:C_')
+    expect(notes).toContain(coverage)
+  })
+
+  it('does not count a malformed opposite endpoint as a wired physical pin', () => {
+    const base: CircuitDocument = {
+      schemaVersion: 1,
+      id: 'project-malformed-coverage',
+      title: 'Malformed coverage',
+      description: 'Coverage validation fixture',
+      revision: 1,
+      components: [],
+      connections: [],
+    }
+    const instance = instantiateCircuitTemplate(base, 'ssi2131-typical', { x: 40, y: 40 })
+    const sawConnection = instance.connections.find((connection) =>
+      connection.from.componentId === instance.primaryComponentId && connection.from.portId === 'saw',
+    )
+    expect(sawConnection).toBeDefined()
+    const document = {
+      ...base,
+      components: instance.components,
+      connections: instance.connections.map((connection) => connection.id === sawConnection?.id
+        ? { ...connection, to: { ...connection.to, portId: 'missing' } }
+        : connection),
+    }
+    const notes = createKicadProjectFiles(document).find((file) => file.path === 'DESIGN-NOTES.md')?.content
+
+    expect(notes).toContain('| U1 SSI2131 | 3 | 15/16 |')
   })
 })

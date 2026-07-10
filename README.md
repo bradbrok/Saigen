@@ -12,6 +12,7 @@ This repository currently contains the first browser MVP: an interactive SSI sub
 - Expanded sources and primitives: constant CV, live gate, repeating trigger, multi-wave function generator, LFO, noise, clock, inductor, diode, LED, Zener, switch, BJTs, MOSFETs, comparator, mixer, attenuverter, and Eurorack rails.
 - Signal-aware audio, CV, gate, power, and passive nets.
 - A flagship `SSI2131 → SSI2144 → SSI2164` voice.
+- Complete package-pin editing for SSI2131, SSI2144, SSI2164, and TL072, plus one-click datasheet application circuits with real editable support parts and per-instance footprint overrides.
 - Live cutoff, resonance, drive, pitch, envelope, source, utility, waveform, and AC-response controls.
 - Click-to-probe nets with four persistent color-coded scope channels, channel visibility and volts/div, 50 µs–10 s/div adaptive timebase, trigger controls, and Vpp/RMS/frequency measurements.
 - SSI chip ground pins default to the `GND` net, are marked `AUTO GND`, and are overridden by any explicit connection.
@@ -40,7 +41,7 @@ pnpm build
 
 ## Model fidelity
 
-The named SSI blocks in this MVP are **datasheet-informed behavioral previews**, not transistor-level models and not sign-off simulation. The canvas deliberately exposes compact musical signal-flow ports. KiCad export expands those macros into the complete 16-pin packages: three locked units for SSI2131, three for SSI2144, and four VCA cells plus a visible power/mode unit for SSI2164. The export does not silently invent the required external application circuitry; the generated design notes call out those remaining production checks.
+The named SSI blocks in this MVP are **datasheet-informed behavioral previews**, not transistor-level models and not sign-off simulation. The canvas and KiCad export both expose the complete physical packages: three locked units for SSI2131, three for SSI2144, and four VCA cells plus a visible power/mode unit for SSI2164. Application templates place the published support networks as normal editable parts; they remain engineering starting points that require ERC/DRC and hardware review.
 
 The small electrical core is real and tested, but it is deliberately not growing into a home-built general SPICE implementation. The production solver boundary is intended for ngspice in a Dedicated Worker, compiled to WebAssembly, with native ngspice used as the validation oracle. A reduced DSP/behavioral path can remain for responsive audio preview.
 
@@ -68,13 +69,13 @@ The current beta does **not** yet provide:
 - Hierarchical sheets, buses, or lossless pass-through of every unknown S-expression.
 - A multi-version KiCad CLI validation matrix in CI. The generated reference bundle is currently smoke-tested locally with KiCad CLI 9.0.3.
 - Automatic conversion of browser behavioral models into KiCad/ngspice subcircuits.
-- Automatic generation of each SSI datasheet application network (timing/pole capacitors, I/V stages, CV scaling, references, and decoupling) from a compact canvas macro.
+- Automatic upgrading of an already-placed bare SSI package into an application template without replacing it. New application circuits can be placed directly from the library.
 
 ## Recommended milestones
 
 1. **Canonical net compiler** — resolve pins, wires, junctions, and labels into persistent nets so disconnecting a wire changes the simulated result.
 2. **Electrical vertical slice** — ngspice/WASM worker spike covering DC, AC, transient, `.model`, `.subckt`, behavioral sources, cancellation, memory reuse, and Safari/Firefox/Chrome.
-3. **Buildable SSI voice** — reusable external application-circuit templates, supply diagnostics, and models validated against published curves around the now-complete SSI package symbols.
+3. **Buildable SSI voice** — supply/tolerance diagnostics and models validated against published curves around the full-pin packages and editable application templates.
 4. **KiCad beta** — flat KiCad 9/10 import/export, embedded symbols, labels, junctions, footprints, simulation properties, golden fixtures, and `kicad-cli` ERC/netlist tests.
 5. **Instrument workflow** — timestamped scope ring buffers, FFT, cursors, AudioWorklet playback, MIDI, automation, WAV export, tolerances, and curated datasheet labs.
 

@@ -15,6 +15,7 @@ export type ConnectionPlan =
 interface ResolvedEndpoint {
   ref: PortRef
   port: ComponentPort
+  kind: CircuitDocument['components'][number]['kind']
 }
 
 type EndpointRole = 'driver' | 'sink' | 'passive'
@@ -23,7 +24,7 @@ function resolveEndpoint(document: CircuitDocument, ref: PortRef): ResolvedEndpo
   const component = document.components.find((candidate) => candidate.id === ref.componentId)
   if (!component) return undefined
   const port = catalogByKind[component.kind].ports.find((candidate) => candidate.id === ref.portId)
-  return port ? { ref, port } : undefined
+  return port ? { ref, port, kind: component.kind } : undefined
 }
 
 function endpointRole(endpoint: ResolvedEndpoint): EndpointRole {
@@ -41,6 +42,25 @@ function connectionSignal(first: ComponentPort, second: ComponentPort): SignalTy
   return first.signal
 }
 
+const ssi2164GroundablePorts = new Set([
+  'audio', 'cv', 'out',
+  'audio2', 'cv2', 'out2',
+  'audio3', 'cv3', 'out3',
+  'audio4', 'cv4', 'out4',
+])
+
+function plannedGroundConnection(first: ResolvedEndpoint, second: ResolvedEndpoint): ConnectionPlan | undefined {
+  const ground = first.kind === 'ground' ? first : second.kind === 'ground' ? second : undefined
+  const target = ground === first ? second : ground === second ? first : undefined
+  if (!ground || !target || target.kind !== 'ssi2164' || !ssi2164GroundablePorts.has(target.ref.portId)) return undefined
+  return {
+    ok: true,
+    from: { ...ground.ref },
+    to: { ...target.ref },
+    signal: 'power',
+  }
+}
+
 /**
  * Validate and orient a guided connection independently of pointer order.
  * Sources and rail symbols lead, sinks trail, and otherwise-undirected passive
@@ -50,6 +70,9 @@ export function planConnection(document: CircuitDocument, firstRef: PortRef, sec
   const first = resolveEndpoint(document, firstRef)
   const second = resolveEndpoint(document, secondRef)
   if (!first || !second) return { ok: false, reason: 'missing-endpoint' }
+
+  const groundConnection = plannedGroundConnection(first, second)
+  if (groundConnection) return groundConnection
 
   const signalsMatch = first.port.signal === second.port.signal ||
     first.port.signal === 'passive' || second.port.signal === 'passive'

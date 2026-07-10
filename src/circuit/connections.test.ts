@@ -87,4 +87,16 @@ describe('directed connection planning', () => {
       { componentId: 'envelope', portId: 'gate' },
     )).toEqual({ ok: false, reason: 'signal-mismatch' })
   })
+
+  it.each(['audio2', 'cv2', 'out2'])(
+    'allows datasheet-required SSI2164 %s grounding from either pointer direction',
+    (portId) => {
+      const ground = { componentId: 'ground', portId: '1' }
+      const vcaPort = { componentId: 'vca', portId }
+      const expected = { ok: true, from: ground, to: vcaPort, signal: 'power' }
+
+      expect(planConnection(demoCircuit, ground, vcaPort)).toEqual(expected)
+      expect(planConnection(demoCircuit, vcaPort, ground)).toEqual(expected)
+    },
+  )
 })

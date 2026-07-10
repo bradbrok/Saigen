@@ -16,7 +16,7 @@ export interface KiCadDevicePin {
   name: string
   electricalType: KiCadElectricalType
   side: KiCadPinSide
-  /** Saigen's compact editor port represented by this physical pin, if any. */
+  /** Saigen canvas port represented by this physical pin. */
   editorPortId?: string
 }
 
@@ -59,11 +59,11 @@ const ssi2131: KiCadDeviceDefinition = {
       height: 17.78,
       pins: [
         { number: '6', name: 'EXPO FREQ', electricalType: 'input', side: 'left', editorPortId: 'pitch' },
-        { number: '12', name: 'LIN FREQ', electricalType: 'input', side: 'left' },
-        { number: '13', name: 'EXPO SCALE', electricalType: 'input', side: 'left' },
-        { number: '8', name: 'TCAP', electricalType: 'passive', side: 'bottom' },
-        { number: '5', name: 'HF TRACK', electricalType: 'output', side: 'right' },
-        { number: '15', name: 'BW COMP', electricalType: 'passive', side: 'right' },
+        { number: '12', name: 'LIN FREQ', electricalType: 'input', side: 'left', editorPortId: 'linFreq' },
+        { number: '13', name: 'EXPO SCALE', electricalType: 'input', side: 'left', editorPortId: 'expoScale' },
+        { number: '8', name: 'TCAP', electricalType: 'passive', side: 'bottom', editorPortId: 'tcap' },
+        { number: '5', name: 'HF TRACK', electricalType: 'output', side: 'right', editorPortId: 'hfTrack' },
+        { number: '15', name: 'BW COMP', electricalType: 'passive', side: 'right', editorPortId: 'bwComp' },
       ],
     },
     {
@@ -74,7 +74,7 @@ const ssi2131: KiCadDeviceDefinition = {
       pins: [
         { number: '3', name: 'PWM CTRL', electricalType: 'input', side: 'left', editorPortId: 'pwm' },
         { number: '10', name: 'HARD SYNC', electricalType: 'input', side: 'left', editorPortId: 'sync' },
-        { number: '11', name: 'SOFT SYNC', electricalType: 'input', side: 'left' },
+        { number: '11', name: 'SOFT SYNC', electricalType: 'input', side: 'left', editorPortId: 'softSync' },
         { number: '1', name: 'SAW OUT', electricalType: 'output', side: 'right', editorPortId: 'saw' },
         { number: '2', name: 'PULSE OUT', electricalType: 'output', side: 'right', editorPortId: 'pulse' },
         { number: '4', name: 'TRI OUT', electricalType: 'output', side: 'right', editorPortId: 'tri' },
@@ -86,9 +86,9 @@ const ssi2131: KiCadDeviceDefinition = {
       width: 15.24,
       height: 12.7,
       pins: [
-        { number: '14', name: 'VREF', electricalType: 'input', side: 'left' },
-        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top' },
-        { number: '7', name: 'V−', electricalType: 'power_in', side: 'bottom' },
+        { number: '14', name: 'VREF', electricalType: 'input', side: 'left', editorPortId: 'vref' },
+        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top', editorPortId: 'vPlus' },
+        { number: '7', name: 'V−', electricalType: 'power_in', side: 'bottom', editorPortId: 'vMinus' },
         { number: '9', name: 'GND', electricalType: 'power_in', side: 'bottom', editorPortId: 'gnd' },
       ],
     },
@@ -113,16 +113,16 @@ const ssi2144: KiCadDeviceDefinition = {
       height: 22.86,
       pins: [
         { number: '1', name: 'SIG IN+', electricalType: 'input', side: 'left', editorPortId: 'audio' },
-        { number: '2', name: 'SIG IN−', electricalType: 'input', side: 'left' },
+        { number: '2', name: 'SIG IN−', electricalType: 'input', side: 'left', editorPortId: 'audioMinus' },
         { number: '3', name: 'OUT', electricalType: 'output', side: 'right', editorPortId: 'out' },
-        { number: '13', name: 'C1A', electricalType: 'passive', side: 'left' },
-        { number: '12', name: 'C1B', electricalType: 'passive', side: 'left' },
-        { number: '11', name: 'C2A', electricalType: 'passive', side: 'left' },
-        { number: '10', name: 'C2B', electricalType: 'passive', side: 'left' },
-        { number: '6', name: 'C3A', electricalType: 'passive', side: 'right' },
-        { number: '7', name: 'C3B', electricalType: 'passive', side: 'right' },
-        { number: '4', name: 'C4A', electricalType: 'passive', side: 'right' },
-        { number: '5', name: 'C4B', electricalType: 'passive', side: 'right' },
+        { number: '13', name: 'C1A', electricalType: 'passive', side: 'left', editorPortId: 'c1a' },
+        { number: '12', name: 'C1B', electricalType: 'passive', side: 'left', editorPortId: 'c1b' },
+        { number: '11', name: 'C2A', electricalType: 'passive', side: 'left', editorPortId: 'c2a' },
+        { number: '10', name: 'C2B', electricalType: 'passive', side: 'left', editorPortId: 'c2b' },
+        { number: '6', name: 'C3A', electricalType: 'passive', side: 'right', editorPortId: 'c3a' },
+        { number: '7', name: 'C3B', electricalType: 'passive', side: 'right', editorPortId: 'c3b' },
+        { number: '4', name: 'C4A', electricalType: 'passive', side: 'right', editorPortId: 'c4a' },
+        { number: '5', name: 'C4B', electricalType: 'passive', side: 'right', editorPortId: 'c4b' },
       ],
     },
     {
@@ -141,8 +141,8 @@ const ssi2144: KiCadDeviceDefinition = {
       width: 12.7,
       height: 10.16,
       pins: [
-        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top' },
-        { number: '8', name: 'V−', electricalType: 'power_in', side: 'bottom' },
+        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top', editorPortId: 'vPlus' },
+        { number: '8', name: 'V−', electricalType: 'power_in', side: 'bottom', editorPortId: 'vMinus' },
         { number: '9', name: 'GND', electricalType: 'power_in', side: 'bottom', editorPortId: 'gnd' },
       ],
     },
@@ -155,7 +155,6 @@ const vcaUnit = (
   inputPin: string,
   controlPin: string,
   outputPin: string,
-  exposeInEditor = false,
 ): KiCadDeviceUnit => ({
   number,
   name,
@@ -167,21 +166,23 @@ const vcaUnit = (
       name: `IIN ${number}`,
       electricalType: 'input',
       side: 'left',
-      editorPortId: exposeInEditor ? 'audio' : undefined,
+      editorPortId: number === 1 ? 'audio' : `audio${number}`,
     },
     {
       number: controlPin,
       name: `VC ${number}`,
-      electricalType: 'passive',
+      electricalType: 'input',
       side: 'left',
-      editorPortId: exposeInEditor ? 'cv' : undefined,
+      editorPortId: number === 1 ? 'cv' : `cv${number}`,
     },
     {
       number: outputPin,
       name: `IOUT ${number}`,
-      electricalType: 'output',
+      // IOUT is a ground-referenced current node. Passive avoids false ERC
+      // conflicts when datasheet-required unused outputs share analog ground.
+      electricalType: 'passive',
       side: 'right',
-      editorPortId: exposeInEditor ? 'out' : undefined,
+      editorPortId: number === 1 ? 'out' : `out${number}`,
     },
   ],
 })
@@ -197,7 +198,7 @@ const ssi2164: KiCadDeviceDefinition = {
   mpn: 'SSI2164S-TU',
   packageName: 'PSL16 / JEDEC MS-012-AC',
   units: [
-    vcaUnit(1, 'VCA 1', '2', '3', '4', true),
+    vcaUnit(1, 'VCA 1', '2', '3', '4'),
     vcaUnit(2, 'VCA 2', '7', '6', '5'),
     vcaUnit(3, 'VCA 3', '10', '11', '12'),
     vcaUnit(4, 'VCA 4', '15', '14', '13'),
@@ -207,10 +208,56 @@ const ssi2164: KiCadDeviceDefinition = {
       width: 12.7,
       height: 12.7,
       pins: [
-        { number: '1', name: 'MODE', electricalType: 'passive', side: 'left' },
-        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top' },
-        { number: '9', name: 'V−', electricalType: 'power_in', side: 'bottom' },
+        { number: '1', name: 'MODE', electricalType: 'passive', side: 'left', editorPortId: 'mode' },
+        { number: '16', name: 'V+', electricalType: 'power_in', side: 'top', editorPortId: 'vPlus' },
+        { number: '9', name: 'V−', electricalType: 'power_in', side: 'bottom', editorPortId: 'vMinus' },
         { number: '8', name: 'GND', electricalType: 'power_in', side: 'bottom', editorPortId: 'gnd' },
+      ],
+    },
+  ],
+}
+
+export const tl072Device: KiCadDeviceDefinition = {
+  kind: 'tl072',
+  symbolName: 'TL072',
+  value: 'TL072',
+  description: 'Low-noise dual JFET-input operational amplifier, full three-unit symbol, SOIC-8',
+  datasheet: 'https://www.ti.com/lit/ds/symlink/tl072.pdf',
+  footprint: 'Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  manufacturer: 'Texas Instruments',
+  mpn: 'TL072DR',
+  packageName: 'SOIC-8 / JEDEC MS-012',
+  units: [
+    {
+      number: 1,
+      name: 'Amplifier A',
+      width: 12.7,
+      height: 10.16,
+      pins: [
+        { number: '3', name: 'A+', electricalType: 'input', side: 'left', editorPortId: 'aPlus' },
+        { number: '2', name: 'A−', electricalType: 'input', side: 'left', editorPortId: 'aMinus' },
+        { number: '1', name: 'A OUT', electricalType: 'output', side: 'right', editorPortId: 'aOut' },
+      ],
+    },
+    {
+      number: 2,
+      name: 'Amplifier B',
+      width: 12.7,
+      height: 10.16,
+      pins: [
+        { number: '5', name: 'B+', electricalType: 'input', side: 'left', editorPortId: 'bPlus' },
+        { number: '6', name: 'B−', electricalType: 'input', side: 'left', editorPortId: 'bMinus' },
+        { number: '7', name: 'B OUT', electricalType: 'output', side: 'right', editorPortId: 'bOut' },
+      ],
+    },
+    {
+      number: 3,
+      name: 'Power',
+      width: 10.16,
+      height: 10.16,
+      pins: [
+        { number: '8', name: 'V+', electricalType: 'power_in', side: 'top', editorPortId: 'vPlus' },
+        { number: '4', name: 'V−', electricalType: 'power_in', side: 'bottom', editorPortId: 'vMinus' },
       ],
     },
   ],
@@ -219,7 +266,7 @@ const ssi2164: KiCadDeviceDefinition = {
 export const ssiDevices = [ssi2131, ssi2144, ssi2164] as const
 
 export const ssiDeviceByKind: Partial<Record<ComponentKind, KiCadDeviceDefinition>> = Object.fromEntries(
-  ssiDevices.map((device) => [device.kind, device]),
+  [...ssiDevices, tl072Device].map((device) => [device.kind, device]),
 )
 
 export function physicalPinCount(device: KiCadDeviceDefinition): number {

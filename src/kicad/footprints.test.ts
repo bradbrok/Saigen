@@ -66,7 +66,7 @@ describe('SSI KiCad footprints', () => {
       expect(directChildren(root, 'fp_line').some((line) => atomAt(directChild(line, 'layer'), 1) === 'F.Fab')).toBe(true)
       expect(directChildren(root, 'fp_line').some((line) => atomAt(directChild(line, 'layer'), 1) === 'F.CrtYd')).toBe(true)
       expect(directChildren(root, 'fp_circle')).toHaveLength(1)
-      expect(directChildren(root, 'model')).toHaveLength(1)
+      expect(directChildren(root, 'model')).toHaveLength(0)
     },
   )
 

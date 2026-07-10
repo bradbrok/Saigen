@@ -1,3 +1,4 @@
+import { catalogByKind } from '../circuit/catalog'
 import { serializeProject, safeFileStem } from '../circuit/persistence'
 import type { CircuitDocument, ComponentKind } from '../circuit/types'
 import { exportKicadSchematic, exportKicadSymbolLibrary } from './adapter'
@@ -49,12 +50,35 @@ function projectSettings(stem: string): string {
 }
 
 function designNotes(document: CircuitDocument, stem: string): string {
-  const devices = [...new Set(document.components.map((component) => component.kind))]
-    .flatMap((kind) => ssiDevices.filter((device) => device.kind === kind))
+  const componentsById = new Map(document.components.map((component) => [component.id, component]))
+  const validConnections = document.connections.filter((connection) => {
+    const fromComponent = componentsById.get(connection.from.componentId)
+    const toComponent = componentsById.get(connection.to.componentId)
+    return Boolean(
+      fromComponent &&
+      toComponent &&
+      catalogByKind[fromComponent.kind].ports.some((port) => port.id === connection.from.portId) &&
+      catalogByKind[toComponent.kind].ports.some((port) => port.id === connection.to.portId),
+    )
+  })
+  const devices = document.components.flatMap((component) => {
+    const device = ssiDevices.find((candidate) => candidate.kind === component.kind)
+    if (!device) return []
+    const connectedPorts = new Set(validConnections.flatMap((connection) => [
+      connection.from.componentId === component.id ? connection.from.portId : undefined,
+      connection.to.componentId === component.id ? connection.to.portId : undefined,
+    ]).filter((portId): portId is string => Boolean(portId)))
+    const mappedPins = device.units.flatMap((unit) => unit.pins).filter((pin) => pin.editorPortId)
+    const hasGround = document.components.some((candidate) => candidate.kind === 'ground')
+    const wiredPins = mappedPins.filter((pin) =>
+      connectedPorts.has(pin.editorPortId!) || (pin.editorPortId === 'gnd' && hasGround),
+    ).length
+    return [{ component, device, wiredPins }]
+  })
 
   const deviceRows = devices.length
-    ? devices.map((device) =>
-      `| ${device.value} | ${device.units.length} | 16 | \`${device.footprint}\` | [datasheet](${device.datasheet}) |`,
+    ? devices.map(({ component, device, wiredPins }) =>
+      `| ${component.reference} ${device.value} | ${device.units.length} | ${wiredPins}/16 | \`${device.footprint}\` | [datasheet](${device.datasheet}) |`,
     ).join('\n')
     : '| — | — | — | — | — |'
 
@@ -64,15 +88,19 @@ Open \`${stem}.kicad_sch\` in KiCad. The project-local symbol and footprint tabl
 
 ## Physical device coverage
 
-| Device | Logical units | Physical pins | Assigned footprint | Source |
+| Device | Logical units | Wired pins | Assigned footprint | Source |
 |---|---:|---:|---|---|
 ${deviceRows}
 
-Every SSI package pin is present exactly once. Power pins are visible. SSI ground pins are connected to the Saigen GND component by default only when that compact editor port has no explicit user connection. The other full-package pins are intentionally left available for design completion; an unconnected pin in this export is not automatically an NC pin.
+Every SSI package pin is present exactly once and every power pin remains visible. The main schematic contains exactly the support components and connections shown on the Saigen canvas. SSI application templates place datasheet networks as editable real parts; dropping a bare IC still leaves those networks for the designer to add. Ground defaults apply only when the visible GND pin has no explicit user connection. SSI2164 MODE is explicitly marked no-connect while unwired, selecting datasheet-defined Class AB operation; wiring MODE overrides that marker. Other unwired pins are not automatically NC pins.
 
 ## Production checks still required
 
-- Add and verify the datasheet application network around each IC before fabrication. The compact Saigen canvas models signal flow; it does not silently invent timing capacitors, pole capacitors, I/V amplifiers, CV scaling, decoupling, or rail conditioning.
+- If an IC was placed without its application template, add its timing/pole capacitors, I/V stages, CV scaling, decoupling, references, and rail conditioning before fabrication.
+- Treat placed templates as editable starting points, then verify component tolerances, voltage ratings, package choices, and CV/audio scaling for the intended module.
+- Source and output symbols are interface placeholders; assign jack/header footprints that match the module's mechanical design before PCB layout.
+- Template passives carry reviewed starting footprints, while bare generic parts remain unassigned; every part's footprint can be overridden in the Saigen inspector.
+- The bundled SSI land patterns omit version-specific 3D-model paths so the project opens cleanly across supported KiCad installations.
 - SSI2131 pin 16 requires regulated +5 V, not the Eurorack +12 V rail. Its pin 14 requires a low-noise 2.5 V reference.
 - SSI2144 requires four external pole capacitors and an output I/V amplifier; raw Eurorack audio/CV levels require conditioning.
 - SSI2164 inputs and current outputs require their external resistor/stability and transimpedance networks. Ground unused VCA signal pins per the datasheet.

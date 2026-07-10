@@ -26,11 +26,15 @@ import {
 } from './devices'
 
 const SYMBOL_PIXEL_TO_MM = 0.1
-const CANVAS_PIXEL_TO_MM = 0.2
-const ORIGIN_X = 30
-const ORIGIN_Y = 25
+const CANVAS_PIXEL_TO_MM = 0.18
+const ORIGIN_X = 20
+const ORIGIN_Y = 15
 const PIN_LENGTH = 2.54
 const KICAD_GRID = 1.27
+const POWER_SYMBOL_KINDS = new Set<ComponentKind>(['plus12V', 'plus5V', 'vref2V5', 'minus12V', 'ground'])
+const HORIZONTAL_TWO_TERMINAL_KINDS = new Set<ComponentKind>([
+  'resistor', 'inductor', 'diode', 'led', 'zenerDiode',
+])
 
 interface ExportOrigin {
   x: number
@@ -94,6 +98,27 @@ function pinType(port: ComponentPort): string {
 function localPortPosition(kind: ComponentKind, port: ComponentPort): { x: number; y: number; angle: number } {
   const { width: bodyWidth, height: bodyHeight } = genericBodySize(kind)
 
+  if (HORIZONTAL_TWO_TERMINAL_KINDS.has(kind)) {
+    return port.side === 'left'
+      ? { x: -bodyWidth / 2 - PIN_LENGTH, y: 0, angle: 0 }
+      : { x: bodyWidth / 2 + PIN_LENGTH, y: 0, angle: 180 }
+  }
+  if (kind === 'capacitor') {
+    return port.side === 'top'
+      ? { x: 0, y: bodyHeight / 2 + PIN_LENGTH, angle: 270 }
+      : { x: 0, y: -bodyHeight / 2 - PIN_LENGTH, angle: 90 }
+  }
+  if (kind === 'potentiometer') {
+    if (port.id === '1') return { x: -bodyWidth / 2 - PIN_LENGTH, y: 0, angle: 0 }
+    if (port.id === '3') return { x: bodyWidth / 2 + PIN_LENGTH, y: 0, angle: 180 }
+    return { x: 0, y: -bodyHeight / 2 - PIN_LENGTH, angle: 90 }
+  }
+  if (POWER_SYMBOL_KINDS.has(kind)) {
+    return port.side === 'top'
+      ? { x: 0, y: bodyHeight / 2 + PIN_LENGTH, angle: 270 }
+      : { x: 0, y: -bodyHeight / 2 - PIN_LENGTH, angle: 90 }
+  }
+
   switch (port.side) {
     case 'left':
       return {
@@ -123,11 +148,60 @@ function localPortPosition(kind: ComponentKind, port: ComponentPort): { x: numbe
 }
 
 function genericBodySize(kind: ComponentKind): { width: number; height: number } {
+  if (HORIZONTAL_TWO_TERMINAL_KINDS.has(kind) || kind === 'capacitor') {
+    return { width: 5.08, height: 2.54 }
+  }
+  if (kind === 'potentiometer') return { width: 5.08, height: 5.08 }
+  if (POWER_SYMBOL_KINDS.has(kind)) return { width: 5.08, height: 2.54 }
   const size = catalogByKind[kind].size
   return {
     width: Math.max(KICAD_GRID * 4, evenGridCeiling(size.width * SYMBOL_PIXEL_TO_MM)),
     height: Math.max(KICAD_GRID * 4, evenGridCeiling(size.height * SYMBOL_PIXEL_TO_MM)),
   }
+}
+
+function genericBodyGraphics(kind: ComponentKind, halfWidth: number, halfHeight: number): string {
+  const stroke = '        (stroke (width 0.254) (type default))'
+  if (kind === 'capacitor') {
+    return `      (polyline (pts (xy ${compactNumber(-halfWidth)} ${compactNumber(halfHeight)}) (xy ${compactNumber(halfWidth)} ${compactNumber(halfHeight)}))
+${stroke}
+        (fill (type none))
+      )
+      (polyline (pts (xy ${compactNumber(-halfWidth)} ${compactNumber(-halfHeight)}) (xy ${compactNumber(halfWidth)} ${compactNumber(-halfHeight)}))
+${stroke}
+        (fill (type none))
+      )`
+  }
+  if (kind === 'ground') {
+    return `      (polyline (pts (xy 0 ${compactNumber(halfHeight)}) (xy 0 0) (xy -2.54 0) (xy 2.54 0))
+${stroke}
+        (fill (type none))
+      )
+      (polyline (pts (xy -1.78 -0.76) (xy 1.78 -0.76))
+${stroke}
+        (fill (type none))
+      )
+      (polyline (pts (xy -0.89 -1.52) (xy 0.89 -1.52))
+${stroke}
+        (fill (type none))
+      )`
+  }
+  if (POWER_SYMBOL_KINDS.has(kind)) {
+    return `      (polyline (pts (xy 0 ${compactNumber(-halfHeight)}) (xy 0 ${compactNumber(halfHeight)}) (xy -1.27 0) (xy 0 ${compactNumber(halfHeight)}) (xy 1.27 0))
+${stroke}
+        (fill (type none))
+      )`
+  }
+  const body = `      (rectangle (start ${compactNumber(-halfWidth)} ${compactNumber(halfHeight)}) (end ${compactNumber(halfWidth)} ${compactNumber(-halfHeight)})
+${stroke}
+        (fill (type background))
+      )`
+  if (kind !== 'potentiometer') return body
+  return `${body}
+      (polyline (pts (xy 0 ${compactNumber(-halfHeight)}) (xy 0 -0.5) (xy 1.27 -1.77))
+${stroke}
+        (fill (type none))
+      )`
 }
 
 function exportOrigin(document: CircuitDocument): ExportOrigin {
@@ -173,6 +247,30 @@ function devicePinPosition(unit: KiCadDeviceUnit, pin: KiCadDevicePin): LocalPin
 }
 
 function unitLayout(device: KiCadDeviceDefinition): Map<number, { x: number; y: number }> {
+  if (device.kind === 'ssi2131' || device.kind === 'ssi2144') {
+    return new Map([
+      [1, { x: -22.86, y: 0 }],
+      [2, { x: 22.86, y: 0 }],
+      [3, { x: 0, y: -25.4 }],
+    ])
+  }
+  if (device.kind === 'tl072') {
+    return new Map([
+      [1, { x: -17.78, y: 0 }],
+      [2, { x: 17.78, y: 0 }],
+      [3, { x: 0, y: -20.32 }],
+    ])
+  }
+  if (device.kind === 'ssi2164') {
+    return new Map([
+      [1, { x: -19.05, y: 0 }],
+      [2, { x: 19.05, y: 0 }],
+      [3, { x: -19.05, y: 25.4 }],
+      [4, { x: 19.05, y: 25.4 }],
+      [5, { x: 0, y: -25.4 }],
+    ])
+  }
+
   const maxWidth = Math.max(...device.units.map((unit) => unit.width ?? 15.24))
   const maxHeight = Math.max(...device.units.map((unit) => unit.height ?? 12.7))
   const columnGap = evenGridCeiling(maxWidth + PIN_LENGTH * 2 + 3)
@@ -233,25 +331,25 @@ function propertyLine(name: string, value: string, id: number, x: number, y: num
 function genericLibrarySymbolDefinition(kind: ComponentKind, qualified: boolean): string {
   const catalog = catalogByKind[kind]
   const name = symbolEntryName(kind)
+  const footprint = ''
   const { width, height } = genericBodySize(kind)
   const halfWidth = width / 2
   const halfHeight = height / 2
+  const schematicOnly = POWER_SYMBOL_KINDS.has(kind)
+  const body = genericBodyGraphics(kind, halfWidth, halfHeight)
   const pins = catalog.ports.map((port) => {
     const position = localPortPosition(kind, port)
     const pinNumber = port.pinNumber ?? port.id
     return `      (pin ${pinType(port)} line (at ${compactNumber(position.x)} ${compactNumber(position.y)} ${position.angle}) (length ${PIN_LENGTH})\n        (name "${escapeString(port.label)}" (effects (font (size 1.02 1.02))))\n        (number "${escapeString(pinNumber)}" (effects (font (size 1.02 1.02))))\n      )`
   }).join('\n')
 
-  return `  (symbol "${qualified ? symbolName(kind) : name}" (pin_names (offset 0.635)) (in_bom yes) (on_board yes)
-${propertyLine('Reference', catalogByKind[kind].shortName.startsWith('#') ? '#PWR' : 'U', 0, 0, halfHeight + 2.6, false)}
+  return `  (symbol "${qualified ? symbolName(kind) : name}" (pin_names (offset 0.635)) (in_bom ${schematicOnly ? 'no' : 'yes'}) (on_board ${schematicOnly ? 'no' : 'yes'})
+${propertyLine('Reference', catalogByKind[kind].shortName.startsWith('#') ? '#PWR' : 'U', 0, 0, halfHeight + 2.6, schematicOnly)}
 ${propertyLine('Value', catalog.name, 1, 0, -halfHeight - 2.6, false)}
-${propertyLine('Footprint', '', 2, 0, 0)}
+${propertyLine('Footprint', footprint, 2, 0, 0)}
 ${propertyLine('Datasheet', '', 3, 0, 0)}
     (symbol "${name}_0_1"
-      (rectangle (start ${compactNumber(-halfWidth)} ${compactNumber(halfHeight)}) (end ${compactNumber(halfWidth)} ${compactNumber(-halfHeight)})
-        (stroke (width 0.254) (type default))
-        (fill (type background))
-      )
+${body}
     )
     (symbol "${name}_1_1"
 ${pins}
@@ -272,12 +370,22 @@ function deviceLibrarySymbolDefinition(device: KiCadDeviceDefinition, qualified:
       )`
     }).join('\n')
 
-    return `    (symbol "${device.symbolName}_${unit.number}_1"
-      (rectangle (start ${compactNumber(-width / 2)} ${compactNumber(height / 2)}) (end ${compactNumber(width / 2)} ${compactNumber(-height / 2)})
+    const body = device.kind === 'tl072' && unit.number <= 2
+      ? `      (polyline (pts (xy ${compactNumber(-width / 2)} ${compactNumber(height / 2)}) (xy ${compactNumber(-width / 2)} ${compactNumber(-height / 2)}) (xy ${compactNumber(width / 2)} 0) (xy ${compactNumber(-width / 2)} ${compactNumber(height / 2)}))
         (stroke (width 0.254) (type default))
         (fill (type background))
-      )
-      (text "${escapeString(unit.name.toUpperCase())}" (at 0 0 0)
+      )`
+      : `      (rectangle (start ${compactNumber(-width / 2)} ${compactNumber(height / 2)}) (end ${compactNumber(width / 2)} ${compactNumber(-height / 2)})
+        (stroke (width 0.254) (type default))
+        (fill (type background))
+      )`
+    const unitLabel = device.kind === 'tl072' && unit.number <= 2
+      ? unit.number === 1 ? 'A' : 'B'
+      : unit.name.toUpperCase()
+
+    return `    (symbol "${device.symbolName}_${unit.number}_1"
+${body}
+      (text "${escapeString(unitLabel)}" (at 0 0 0)
         (effects (font (size 1.02 1.02) (thickness 0.15)))
       )
 ${pins}
@@ -332,11 +440,13 @@ function genericInstanceSymbol(document: CircuitDocument, component: CircuitComp
   const catalog = catalogByKind[component.kind]
   const uuid = stableUuid(`${document.id}:component:${component.id}`)
   const value = component.value ?? catalog.name
+  const footprint = component.footprint ?? ''
+  const schematicOnly = POWER_SYMBOL_KINDS.has(component.kind)
   const bodyHeight = genericBodySize(component.kind).height
   const properties = [
-    propertyLine('Reference', component.reference, 0, center.x, center.y - bodyHeight / 2 - 2.6, false),
+    propertyLine('Reference', component.reference, 0, center.x, center.y - bodyHeight / 2 - 2.6, schematicOnly),
     propertyLine('Value', value, 1, center.x, center.y + bodyHeight / 2 + 2.6, false),
-    propertyLine('Footprint', '', 2, center.x, center.y),
+    propertyLine('Footprint', footprint, 2, center.x, center.y),
     propertyLine('Datasheet', '', 3, center.x, center.y),
     propertyLine('Saigen.Id', component.id, 4, center.x, center.y),
     propertyLine('Saigen.Kind', component.kind, 5, center.x, center.y),
@@ -350,8 +460,8 @@ function genericInstanceSymbol(document: CircuitDocument, component: CircuitComp
   ).join('\n')
 
   return `  (symbol (lib_id "${symbolName(component.kind)}") (at ${compactNumber(center.x)} ${compactNumber(center.y)} 0) (unit 1)
-    (in_bom yes) (on_board yes) (uuid ${uuid})
-    (default_instance (reference "${escapeString(component.reference)}") (unit 1) (value "${escapeString(value)}") (footprint ""))
+    (in_bom ${schematicOnly ? 'no' : 'yes'}) (on_board ${schematicOnly ? 'no' : 'yes'}) (uuid ${uuid})
+    (default_instance (reference "${escapeString(component.reference)}") (unit 1) (value "${escapeString(value)}") (footprint "${escapeString(footprint)}"))
 ${properties}
 ${pins}
   )`
@@ -365,6 +475,7 @@ function deviceInstanceSymbols(
 ): string[] {
   const catalog = catalogByKind[component.kind]
   const value = component.value ?? device.value
+  const footprint = component.footprint ?? device.footprint
   return device.units.map((unit) => {
     const center = unitCenter(component, device, unit, origin)
     const uuid = stableUuid(`${document.id}:component:${component.id}:unit:${unit.number}`)
@@ -372,7 +483,7 @@ function deviceInstanceSymbols(
     const properties = [
       propertyLine('Reference', component.reference, 0, center.x, center.y - height / 2 - 2.6, false),
       propertyLine('Value', value, 1, center.x, center.y + height / 2 + 2.6, false),
-      propertyLine('Footprint', device.footprint, 2, center.x, center.y),
+      propertyLine('Footprint', footprint, 2, center.x, center.y),
       propertyLine('Datasheet', device.datasheet, 3, center.x, center.y),
       propertyLine('Manufacturer', device.manufacturer, 4, center.x, center.y),
       propertyLine('MPN', device.mpn, 5, center.x, center.y),
@@ -391,7 +502,7 @@ function deviceInstanceSymbols(
 
     return `  (symbol (lib_id "${symbolName(component.kind)}") (at ${compactNumber(center.x)} ${compactNumber(center.y)} 0) (unit ${unit.number})
     (in_bom yes) (on_board yes) (uuid ${uuid})
-    (default_instance (reference "${escapeString(component.reference)}") (unit ${unit.number}) (value "${escapeString(value)}") (footprint "${escapeString(device.footprint)}"))
+    (default_instance (reference "${escapeString(component.reference)}") (unit ${unit.number}) (value "${escapeString(value)}") (footprint "${escapeString(footprint)}"))
 ${properties}
 ${pins}
   )`
@@ -448,9 +559,48 @@ function effectiveConnections(document: CircuitDocument): CircuitConnection[] {
   return connections
 }
 
-function wireSegments(document: CircuitDocument, origin: ExportOrigin): string[] {
+function endpointKey(ref: CircuitConnection['from']): string {
+  return `${ref.componentId}\u0000${ref.portId}`
+}
+
+function railNetName(component: CircuitComponent | undefined): string | undefined {
+  switch (component?.kind) {
+    case 'ground': return 'GND'
+    case 'plus12V': return '+12V'
+    case 'minus12V': return '-12V'
+    case 'plus5V': return '+5V'
+    case 'vref2V5': return 'VREF_2V5'
+    default: return undefined
+  }
+}
+
+/**
+ * Compile graph connections to named KiCad nets. Labels attach directly to
+ * pin endpoints, avoiding accidental junctions from routed or overlapping
+ * support wires in dense application templates.
+ */
+function netGraphics(document: CircuitDocument, origin: ExportOrigin): string[] {
   const components = new Map(document.components.map((component) => [component.id, component]))
-  const wires: string[] = []
+  const parent = new Map<string, string>()
+  const connectionIdsByEndpoint = new Map<string, Set<string>>()
+  const connectionsByRoot = new Map<string, CircuitConnection[]>()
+
+  const find = (key: string): string => {
+    const current = parent.get(key)
+    if (!current) {
+      parent.set(key, key)
+      return key
+    }
+    if (current === key) return key
+    const root = find(current)
+    parent.set(key, root)
+    return root
+  }
+  const union = (left: string, right: string): void => {
+    const leftRoot = find(left)
+    const rightRoot = find(right)
+    if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot)
+  }
 
   for (const connection of effectiveConnections(document)) {
     const fromComponent = components.get(connection.from.componentId)
@@ -459,21 +609,107 @@ function wireSegments(document: CircuitDocument, origin: ExportOrigin): string[]
     const from = absolutePortPosition(fromComponent, connection.from.portId, origin)
     const to = absolutePortPosition(toComponent, connection.to.portId, origin)
     if (!from || !to) continue
-    const middleX = snapToGrid((from.x + to.x) / 2)
-    const points = [from, { x: middleX, y: from.y }, { x: middleX, y: to.y }, to]
+    const fromKey = endpointKey(connection.from)
+    const toKey = endpointKey(connection.to)
+    union(fromKey, toKey)
+    for (const key of [fromKey, toKey]) {
+      const ids = connectionIdsByEndpoint.get(key) ?? new Set<string>()
+      ids.add(connection.id)
+      connectionIdsByEndpoint.set(key, ids)
+    }
+  }
 
-    for (let index = 0; index < points.length - 1; index += 1) {
-      const start = points[index]
-      const end = points[index + 1]
-      if (Math.abs(start.x - end.x) < 1e-6 && Math.abs(start.y - end.y) < 1e-6) continue
-      wires.push(`  (wire (pts (xy ${compactNumber(start.x)} ${compactNumber(start.y)}) (xy ${compactNumber(end.x)} ${compactNumber(end.y)}))
-    (stroke (width 0) (type default))
-    (uuid ${stableUuid(`${document.id}:wire:${connection.id}:${index}`)})
+  for (const connection of effectiveConnections(document)) {
+    const fromKey = endpointKey(connection.from)
+    const toKey = endpointKey(connection.to)
+    if (!parent.has(fromKey) || !parent.has(toKey)) continue
+    const root = find(fromKey)
+    const group = connectionsByRoot.get(root) ?? []
+    group.push(connection)
+    connectionsByRoot.set(root, group)
+  }
+
+  const graphics: string[] = []
+  const usedNames = new Set<string>()
+  for (const [root, connections] of [...connectionsByRoot].sort(([left], [right]) => left.localeCompare(right))) {
+    const endpoints = [...parent.keys()].filter((key) => find(key) === root).sort()
+    const railName = endpoints.flatMap((key) => {
+      const [componentId] = key.split('\u0000')
+      const name = railNetName(components.get(componentId))
+      return name ? [name] : []
+    })[0]
+    const primaryConnection = [...connections].sort((left, right) => left.id.localeCompare(right.id))[0]
+    const hash = hash32(endpoints.join('|'), 0x811c9dc5).toString(16).slice(0, 4).toUpperCase()
+    const signalPrefix = primaryConnection.signal === 'audio'
+      ? 'A'
+      : primaryConnection.signal === 'cv'
+        ? 'CV'
+        : primaryConnection.signal === 'gate'
+          ? 'G'
+          : primaryConnection.signal === 'power'
+            ? 'P'
+            : 'N'
+    const baseName = railName ?? `${signalPrefix}_${hash}`
+    let name = baseName
+    if (!railName) {
+      let suffix = 2
+      while (usedNames.has(name)) {
+        name = `${baseName}_${suffix}`
+        suffix += 1
+      }
+      usedNames.add(name)
+    }
+
+    for (const key of endpoints) {
+      const [componentId, portId] = key.split('\u0000')
+      const component = components.get(componentId)
+      const position = component && absolutePortPosition(component, portId, origin)
+      if (!position) continue
+      const devicePin = component && ssiDeviceByKind[component.kind]
+        ? editorPin(ssiDeviceByKind[component.kind]!, portId)?.pin
+        : undefined
+      const side = devicePin?.side ?? catalogByKind[component.kind].ports.find((port) => port.id === portId)?.side
+      if (!side) continue
+      const labelAngle = side === 'top' || side === 'bottom' ? 90 : 0
+      const justify = side === 'left' || side === 'top' ? 'right bottom' : 'left bottom'
+      const sourceId = [...(connectionIdsByEndpoint.get(key) ?? [])].sort()[0] ?? primaryConnection.id
+      graphics.push(`  (label "${escapeString(name)}" (at ${compactNumber(position.x)} ${compactNumber(position.y)} ${labelAngle})
+    (effects (font (size 0.9 0.9)) (justify ${justify}))
+    (uuid ${stableUuid(`${document.id}:label:${sourceId}:${componentId}:${portId}`)})
   )`)
     }
   }
 
-  return wires
+  return graphics
+}
+
+function defaultNoConnectMarkers(document: CircuitDocument, origin: ExportOrigin): string[] {
+  const components = new Map(document.components.map((component) => [component.id, component]))
+  const connected = new Set<string>()
+
+  for (const connection of effectiveConnections(document)) {
+    const fromComponent = components.get(connection.from.componentId)
+    const toComponent = components.get(connection.to.componentId)
+    if (
+      !fromComponent ||
+      !toComponent ||
+      !absolutePortPosition(fromComponent, connection.from.portId, origin) ||
+      !absolutePortPosition(toComponent, connection.to.portId, origin)
+    ) continue
+    connected.add(endpointKey(connection.from))
+    connected.add(endpointKey(connection.to))
+  }
+
+  return document.components.flatMap((component) =>
+    catalogByKind[component.kind].ports.flatMap((port) => {
+      if (!port.defaultNoConnect || connected.has(endpointKey({ componentId: component.id, portId: port.id }))) return []
+      const position = absolutePortPosition(component, port.id, origin)
+      if (!position) return []
+      return [`  (no_connect (at ${compactNumber(position.x)} ${compactNumber(position.y)})
+    (uuid ${stableUuid(`${document.id}:no-connect:${component.id}:${port.id}`)})
+  )`]
+    }),
+  )
 }
 
 export function exportKicadSchematic(document: CircuitDocument): string {
@@ -483,12 +719,13 @@ export function exportKicadSchematic(document: CircuitDocument): string {
   const title = escapeString(document.title)
   const libSymbols = kinds.map((kind) => librarySymbolDefinition(kind)).join('\n')
   const symbols = document.components.flatMap((component) => instanceSymbols(document, component, origin)).join('\n')
-  const wires = wireSegments(document, origin).join('\n')
+  const connections = netGraphics(document, origin).join('\n')
+  const noConnects = defaultNoConnectMarkers(document, origin).join('\n')
   const symbolInstances = document.components.flatMap((component) => {
     const catalog = catalogByKind[component.kind]
     const device = ssiDeviceByKind[component.kind]
     const value = component.value ?? device?.value ?? catalog.name
-    const footprint = device?.footprint ?? ''
+    const footprint = component.footprint ?? device?.footprint ?? ''
     const units = device?.units ?? [{ number: 1 }]
     return units.map((unit) => {
       const uuid = device
@@ -505,7 +742,8 @@ export function exportKicadSchematic(document: CircuitDocument): string {
   (lib_symbols
 ${libSymbols}
   )
-${wires}
+${noConnects}
+${connections}
 ${symbols}
   (sheet_instances (path "/" (page "1")))
   (symbol_instances
@@ -539,8 +777,11 @@ function inferKind(libraryId: string, reference: string): ComponentKind {
   if (normalized.includes('ssi2131')) return 'ssi2131'
   if (normalized.includes('ssi2144')) return 'ssi2144'
   if (normalized.includes('ssi2164')) return 'ssi2164'
+  if (normalized.includes('tl072')) return 'tl072'
   if (librarySymbol === '+12v') return 'plus12V'
+  if (librarySymbol === '+5v') return 'plus5V'
   if (librarySymbol === '-12v') return 'minus12V'
+  if (librarySymbol === 'vref_2v5' || librarySymbol === '2v5') return 'vref2V5'
   if (librarySymbol.startsWith('gnd')) return 'ground'
   if (normalized.endsWith(':r') || reference.startsWith('R')) return 'resistor'
   if (normalized.endsWith(':c') || reference.startsWith('C')) return 'capacitor'
@@ -629,12 +870,14 @@ export function importKicadSchematic(source: string): ImportResult {
     }
 
     metadataById.set(id, embeddedProperty(properties, 'Connections') ?? '')
+    const footprint = properties.get('Footprint')
     components.push({
       id,
       kind,
       reference,
       label: properties.get('Value') ?? catalog.name,
       value: properties.get('Value'),
+      ...(footprint ? { footprint } : {}),
       position,
       parameters,
     })

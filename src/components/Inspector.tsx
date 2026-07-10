@@ -8,6 +8,7 @@ interface InspectorProps {
   controls: SimulationControls
   onControlsChange: (next: Partial<SimulationControls>) => void
   onValueChange: (value: string) => void
+  onFootprintChange: (footprint: string) => void
   onParameterChange: (key: string, value: number) => void
   onDelete: () => void
   onDuplicate: () => void
@@ -124,6 +125,7 @@ export function Inspector({
   controls,
   onControlsChange,
   onValueChange,
+  onFootprintChange,
   onParameterChange,
   onDelete,
   onDuplicate,
@@ -327,6 +329,16 @@ export function Inspector({
               })}
             </div>
           )}
+
+          <label className="text-control">
+            <span>KiCad footprint override</span>
+            <input
+              value={component.footprint ?? ''}
+              onChange={(event) => onFootprintChange(event.target.value)}
+              placeholder="Unassigned — Library:Footprint"
+              spellCheck={false}
+            />
+          </label>
         </section>
 
         {catalog.ports.length > 0 && (
@@ -340,7 +352,9 @@ export function Inspector({
                   <strong>{port.label}</strong>
                   <span>{port.defaultNet
                     ? `AUTO ${port.defaultNet}`
-                    : `${port.signal.toUpperCase()} · ${portRoleLabel(port.direction)}`}</span>
+                    : port.defaultNoConnect
+                      ? 'AUTO NC · OVERRIDABLE'
+                      : `${port.signal.toUpperCase()} · ${portRoleLabel(port.direction)}`}</span>
                 </div>
               ))}
             </div>
@@ -358,8 +372,10 @@ export function Inspector({
               <p>
                 {catalog.category === 'sources'
                   ? 'Ideal live source for wiring and scope preview. Input-driven reset, sync, and downstream circuit response will move into the graph solver.'
-                  : catalog.modelStage === 'behavioral'
-                  ? 'Fast musical preview. The macro exposes key signal pins but is not yet a fabrication-ready package symbol or transistor-level sign-off model.'
+                  : component.kind.startsWith('ssi')
+                    ? 'Fast musical preview with the complete physical pin map. Place an application template for editable support circuitry, then run KiCad ERC/DRC and hardware review.'
+                    : catalog.modelStage === 'behavioral'
+                    ? 'Fast musical preview. This block is not a transistor-level sign-off model.'
                   : 'This primitive is included in the electrical-core validation path.'}
               </p>
             </div>

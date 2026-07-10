@@ -4,6 +4,11 @@ import { planConnection } from './circuit/connections'
 import { defaultControls, demoCircuit } from './circuit/demo'
 import { diagnoseCircuit } from './circuit/diagnostics'
 import { downloadBinaryFile, downloadTextFile, parseProject, safeFileStem, serializeProject } from './circuit/persistence'
+import {
+  circuitTemplates,
+  instantiateCircuitTemplate,
+  type CircuitTemplateId,
+} from './circuit/templates'
 import type {
   CircuitComponent,
   CircuitDocument,
@@ -164,6 +169,36 @@ export default function App() {
     announce({ kind: 'success', title: `${catalog.name} added`, message: 'Placed on the canvas and ready to connect.' })
   }
 
+  const addCircuitTemplate = (id: CircuitTemplateId) => {
+    const template = circuitTemplates.find((candidate) => candidate.id === id)
+    if (!template) return
+    const minX = circuit.components.length
+      ? Math.min(...circuit.components.map((component) => component.position.x))
+      : 40
+    const maxY = circuit.components.length
+      ? Math.max(...circuit.components.map((component) =>
+        component.position.y + catalogByKind[component.kind].size.height,
+      ))
+      : -80
+    const instance = instantiateCircuitTemplate(circuit, id, {
+      x: Math.max(40, minX),
+      y: maxY + 120,
+    })
+    commit({
+      ...circuit,
+      components: [...circuit.components, ...instance.components],
+      connections: [...circuit.connections, ...instance.connections],
+    })
+    setSelectedId(instance.primaryComponentId)
+    setPendingPort(undefined)
+    setTool('select')
+    announce({
+      kind: 'success',
+      title: `${template.name} placed`,
+      message: `${instance.components.length} editable parts and ${instance.connections.length} datasheet connections added as one undoable action.`,
+    })
+  }
+
   const deleteSelected = () => {
     if (!selected) return
     const next = {
@@ -226,6 +261,18 @@ export default function App() {
       ...current,
       components: current.components.map((component) =>
         component.id === selected.id ? { ...component, value } : component,
+      ),
+    }))
+  }
+
+  const updateSelectedFootprint = (footprint: string) => {
+    if (!selected) return
+    setCircuit((current) => ({
+      ...current,
+      components: current.components.map((component) =>
+        component.id === selected.id
+          ? { ...component, footprint: footprint || undefined }
+          : component,
       ),
     }))
   }
@@ -490,7 +537,12 @@ export default function App() {
       {paletteOpen && <button className="mobile-palette-backdrop" onClick={() => setPaletteOpen(false)} aria-label="Close component library" />}
 
       <div className="workspace">
-        <ComponentPalette onAdd={addComponent} mobileOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        <ComponentPalette
+          onAdd={addComponent}
+          onAddTemplate={addCircuitTemplate}
+          mobileOpen={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+        />
         <main className="workbench">
           <SchematicCanvas
             document={circuit}
@@ -519,6 +571,7 @@ export default function App() {
           controls={controls}
           onControlsChange={updateControls}
           onValueChange={updateSelectedValue}
+          onFootprintChange={updateSelectedFootprint}
           onParameterChange={updateSelectedParameter}
           onDelete={deleteSelected}
           onDuplicate={duplicateSelected}

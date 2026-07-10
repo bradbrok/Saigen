@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react'
 import { categoryLabels, componentCatalog } from '../circuit/catalog'
+import { circuitTemplates } from '../circuit/templates'
+import type { CircuitTemplateId } from '../circuit/templates'
 import type { ComponentCategory, ComponentKind } from '../circuit/types'
 import { Icon } from './Icon'
 
 interface ComponentPaletteProps {
   onAdd: (kind: ComponentKind) => void
+  onAddTemplate?: (id: CircuitTemplateId) => void
   mobileOpen?: boolean
   onClose?: () => void
 }
 
 const categoryOrder: ComponentCategory[] = ['sources', 'ssi', 'passives', 'utility']
 
-export function ComponentPalette({ onAdd, mobileOpen = false, onClose }: ComponentPaletteProps) {
+export function ComponentPalette({ onAdd, onAddTemplate, mobileOpen = false, onClose }: ComponentPaletteProps) {
   const [query, setQuery] = useState('')
   const normalizedQuery = query.trim().toLowerCase()
   const filtered = useMemo(() => componentCatalog.filter((component) =>
@@ -21,6 +24,12 @@ export function ComponentPalette({ onAdd, mobileOpen = false, onClose }: Compone
       component.description.toLowerCase().includes(normalizedQuery) ||
       component.shortName.toLowerCase().includes(normalizedQuery)
     )), [normalizedQuery])
+  const filteredTemplates = useMemo(() => circuitTemplates.filter((template) =>
+    !normalizedQuery ||
+    template.name.toLowerCase().includes(normalizedQuery) ||
+    template.description.toLowerCase().includes(normalizedQuery) ||
+    template.shortName.toLowerCase().includes(normalizedQuery)
+  ), [normalizedQuery])
 
   return (
     <aside className={`component-palette ${mobileOpen ? 'is-mobile-open' : ''}`} aria-label="Component library">
@@ -41,13 +50,48 @@ export function ComponentPalette({ onAdd, mobileOpen = false, onClose }: Compone
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search parts"
-          aria-label="Search components"
+          placeholder="Search parts & circuits"
+          aria-label="Search parts and application circuits"
         />
         <kbd>/</kbd>
       </label>
 
       <div className="palette-scroll">
+        {filteredTemplates.length > 0 && (
+          <section className="palette-section template-section">
+            <div className="palette-section-title template-section-title">
+              <span>Application templates</span>
+              <span>{String(filteredTemplates.length).padStart(2, '0')}</span>
+            </div>
+            <p className="template-section-intro">Datasheet circuits, ready to place and customize.</p>
+            <div className="palette-list template-list">
+              {filteredTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  className="template-item"
+                  disabled={!onAddTemplate}
+                  onClick={() => {
+                    onAddTemplate?.(template.id)
+                    if (onAddTemplate) onClose?.()
+                  }}
+                  title={`Place ${template.name} circuit`}
+                >
+                  <span className="template-mark" aria-hidden="true">
+                    <span>{template.shortName}</span>
+                    <i /><i /><i />
+                  </span>
+                  <span className="template-copy">
+                    <span className="template-kind">Circuit template</span>
+                    <strong>{template.name}</strong>
+                    <small>{template.description}</small>
+                    <span className="template-action">Place circuit <Icon name="plus" size={11} /></span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {categoryOrder.map((category) => {
           const components = filtered.filter((component) => component.category === category)
           if (components.length === 0) return null
@@ -83,9 +127,9 @@ export function ComponentPalette({ onAdd, mobileOpen = false, onClose }: Compone
           )
         })}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && filteredTemplates.length === 0 && (
           <div className="empty-state compact">
-            <span>No matching parts</span>
+            <span>No matching parts or circuits</span>
             <button onClick={() => setQuery('')}>Clear search</button>
           </div>
         )}
@@ -94,8 +138,8 @@ export function ComponentPalette({ onAdd, mobileOpen = false, onClose }: Compone
       <div className="library-status">
         <span className="status-orbit"><i /><i /><i /></span>
         <div>
-          <strong>SSI voice set</strong>
-          <small>3 pin-mapped behavioral previews</small>
+          <strong>Fabrication-aware library</strong>
+          <small>Full pin maps · footprints · circuit templates</small>
         </div>
         <Icon name="chevron" size={15} />
       </div>

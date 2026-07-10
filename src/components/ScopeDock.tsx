@@ -97,6 +97,8 @@ function connectionValue(
   const time = index / sampleRate
 
   if (connection.signal === 'power') {
+    const declaredVoltage = from?.parameters.voltage
+    if (declaredVoltage !== undefined) return declaredVoltage
     if (from?.kind === 'minus12V') return -12
     if (from?.kind === 'ground') return 0
     return 12
