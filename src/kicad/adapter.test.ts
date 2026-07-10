@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { demoCircuit } from '../circuit/demo'
-import { exportKicadSchematic, importKicadSchematic, stableUuid } from './adapter'
+import { exportKicadSchematic, exportKicadSymbolLibrary, importKicadSchematic, stableUuid } from './adapter'
 import { atomAt, directChild, directChildren, parseSExpressions, tokenizeSExpression } from './sexpr'
 
 function singleSymbolSchematic({
@@ -45,9 +45,50 @@ describe('KiCad adapter', () => {
     const source = exportKicadSchematic(demoCircuit)
     expect(source).toContain('(generator saigen)')
     expect(source).toContain('(lib_symbols')
-    expect(source).toContain('(symbol "Saigen:ssi2144"')
+    expect(source).toContain('(symbol "Saigen:SSI2144"')
     expect(source).toContain('(property "Saigen.Kind" "ssi2144"')
     expect(() => parseSExpressions(source)).not.toThrow()
+  })
+
+  it('exports all physical SSI pins as locked non-interchangeable units', () => {
+    const source = exportKicadSymbolLibrary(['ssi2131', 'ssi2144', 'ssi2164'])
+    const root = parseSExpressions(source)[0]
+    const symbols = directChildren(root, 'symbol')
+    const expectedUnits = new Map([
+      ['SSI2131', 3],
+      ['SSI2144', 3],
+      ['SSI2164', 5],
+    ])
+
+    for (const symbol of symbols) {
+      const name = atomAt(symbol, 1) ?? ''
+      const units = directChildren(symbol, 'symbol')
+      const pinNumbers = units.flatMap((unit) =>
+        directChildren(unit, 'pin').map((pin) => atomAt(directChild(pin, 'number'), 1)),
+      )
+      expect(units).toHaveLength(expectedUnits.get(name) ?? 0)
+      expect(pinNumbers.sort((left, right) => Number(left) - Number(right))).toEqual(
+        Array.from({ length: 16 }, (_, index) => String(index + 1)),
+      )
+      expect(source).toContain('(property "ki_locked" "yes"')
+    }
+  })
+
+  it('expands each SSI package into every schematic unit with one shared footprint', () => {
+    const source = exportKicadSchematic(demoCircuit)
+    const root = parseSExpressions(source)[0]
+    const instances = directChildren(root, 'symbol').filter((symbol) => directChild(symbol, 'lib_id'))
+    const instancesFor = (id: string) => instances.filter((symbol) =>
+      directChildren(symbol, 'property').some((property) =>
+        atomAt(property, 1) === 'Saigen.Id' && atomAt(property, 2) === id,
+      ),
+    )
+
+    expect(instancesFor('vco')).toHaveLength(3)
+    expect(instancesFor('vcf')).toHaveLength(3)
+    expect(instancesFor('vca')).toHaveLength(5)
+    expect(source).toContain('(property "Footprint" "Saigen:SSI_PSL16_SOIC-16_3.9x9.9mm_P1.27mm"')
+    expect(source).toContain('(property "Footprint" "Saigen:SSI_PSSL16_SSOP-16_3.9x4.9mm_P0.635mm"')
   })
 
   it('derives KiCad pin electrical types from declared port directions', () => {
@@ -143,6 +184,29 @@ describe('KiCad adapter', () => {
     expect(importKicadSchematic(source).document.components.map((component) => component.position)).toEqual(
       document.components.map((component) => component.position),
     )
+  })
+
+  it('places symbol origins and wire endpoints on KiCad’s 1.27 mm schematic grid', () => {
+    const source = exportKicadSchematic(demoCircuit)
+    const root = parseSExpressions(source)[0]
+    const coordinates = [
+      ...directChildren(root, 'symbol')
+        .filter((symbol) => directChild(symbol, 'lib_id'))
+        .flatMap((symbol) => {
+          const at = directChild(symbol, 'at')
+          return [Number(atomAt(at, 1)), Number(atomAt(at, 2))]
+        }),
+      ...directChildren(root, 'wire').flatMap((wire) =>
+        directChildren(directChild(wire, 'pts'), 'xy').flatMap((point) => [
+          Number(atomAt(point, 1)),
+          Number(atomAt(point, 2)),
+        ]),
+      ),
+    ]
+
+    expect(coordinates.length).toBeGreaterThan(0)
+    expect(coordinates.every((coordinate) => Math.abs(coordinate / 1.27 - Math.round(coordinate / 1.27)) < 1e-6))
+      .toBe(true)
   })
 
   it.each([

@@ -19,7 +19,7 @@ This repository currently contains the first browser MVP: an interactive SSI sub
 - Optional browser audio monitor using Web Audio.
 - Pure TypeScript electrical-core validation for engineering values, linear systems, voltage dividers, and RC transient response.
 - Portable versioned Saigen JSON projects.
-- Flat modern `.kicad_sch` export with embedded Saigen symbols and stable UUIDs.
+- Portable KiCad project ZIP export with a modern `.kicad_sch`, project-local symbol/footprint tables, full SSI pinouts, multi-unit symbols, datasheet URLs, package fields, and PSL16/PSSL16 footprints.
 - `.kicad_sch` import for symbols plus exact Saigen graph round trips; unsupported symbols are surfaced as visual blocks with warnings.
 
 ## Start the app
@@ -40,7 +40,7 @@ pnpm build
 
 ## Model fidelity
 
-The named SSI blocks in this MVP are **datasheet-informed behavioral previews**, not transistor-level models and not sign-off simulation. Their exposed macro ports use real package pin numbers for the signals shown, but the current symbols do not expose every package pin or the full external application circuit. The interface makes that distinction visible.
+The named SSI blocks in this MVP are **datasheet-informed behavioral previews**, not transistor-level models and not sign-off simulation. The canvas deliberately exposes compact musical signal-flow ports. KiCad export expands those macros into the complete 16-pin packages: three locked units for SSI2131, three for SSI2144, and four VCA cells plus a visible power/mode unit for SSI2164. The export does not silently invent the required external application circuitry; the generated design notes call out those remaining production checks.
 
 The small electrical core is real and tested, but it is deliberately not growing into a home-built general SPICE implementation. The production solver boundary is intended for ngspice in a Dedicated Worker, compiled to WebAssembly, with native ngspice used as the validation oracle. A reduced DSP/behavioral path can remain for responsive audio preview.
 
@@ -59,22 +59,22 @@ The canonical document is intentionally not a KiCad AST or a SPICE netlist. Visu
 
 ## Current KiCad boundary
 
-Saigen-authored files round-trip the component graph and connections through hidden `Saigen.*` symbol properties. Import remains compatible with early `EuroSim.*` metadata. Exported files are flat schematics with embedded custom symbols, so they do not depend on a separately installed Saigen symbol library.
+Saigen-authored files round-trip the component graph and connections through hidden `Saigen.*` symbol properties. Import remains compatible with early `EuroSim.*` metadata and collapses a KiCad multi-unit device back into one compact Saigen component. Exported schematics embed their symbols and the ZIP also includes a project-local `Saigen.kicad_sym`, `Saigen.pretty`, `sym-lib-table`, and `fp-lib-table`. SSI package pins are identity-mapped to pads 1–16, with no invented NC or exposed pads.
 
 The current beta does **not** yet provide:
 
 - Generic wire-to-pin connectivity inference for arbitrary imported KiCad files.
 - Round-tripping wire geometry edits made in KiCad when Saigen graph metadata is present.
 - Hierarchical sheets, buses, or lossless pass-through of every unknown S-expression.
-- Complete fabrication-ready SSI package symbols and footprints.
-- A KiCad CLI validation matrix in CI. `kicad-cli` is not installed in this development environment.
+- A multi-version KiCad CLI validation matrix in CI. The generated reference bundle is currently smoke-tested locally with KiCad CLI 9.0.3.
 - Automatic conversion of browser behavioral models into KiCad/ngspice subcircuits.
+- Automatic generation of each SSI datasheet application network (timing/pole capacitors, I/V stages, CV scaling, references, and decoupling) from a compact canvas macro.
 
 ## Recommended milestones
 
 1. **Canonical net compiler** — resolve pins, wires, junctions, and labels into persistent nets so disconnecting a wire changes the simulated result.
 2. **Electrical vertical slice** — ngspice/WASM worker spike covering DC, AC, transient, `.model`, `.subckt`, behavioral sources, cancellation, memory reuse, and Safari/Firefox/Chrome.
-3. **Buildable SSI voice** — complete SSI2131, SSI2144, and SSI2164 macro symbols, external application circuits, supply diagnostics, and models validated against published curves.
+3. **Buildable SSI voice** — reusable external application-circuit templates, supply diagnostics, and models validated against published curves around the now-complete SSI package symbols.
 4. **KiCad beta** — flat KiCad 9/10 import/export, embedded symbols, labels, junctions, footprints, simulation properties, golden fixtures, and `kicad-cli` ERC/netlist tests.
 5. **Instrument workflow** — timestamped scope ring buffers, FFT, cursors, AudioWorklet playback, MIDI, automation, WAV export, tolerances, and curated datasheet labs.
 

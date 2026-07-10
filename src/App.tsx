@@ -3,7 +3,7 @@ import { catalogByKind, referencePrefix } from './circuit/catalog'
 import { planConnection } from './circuit/connections'
 import { defaultControls, demoCircuit } from './circuit/demo'
 import { diagnoseCircuit } from './circuit/diagnostics'
-import { downloadTextFile, parseProject, safeFileStem, serializeProject } from './circuit/persistence'
+import { downloadBinaryFile, downloadTextFile, parseProject, safeFileStem, serializeProject } from './circuit/persistence'
 import type {
   CircuitComponent,
   CircuitDocument,
@@ -19,7 +19,8 @@ import { Inspector } from './components/Inspector'
 import { SchematicCanvas } from './components/SchematicCanvas'
 import { ScopeDock } from './components/ScopeDock'
 import { useAudioMonitor } from './hooks/useAudioMonitor'
-import { exportKicadSchematic, importKicadSchematic } from './kicad/adapter'
+import { importKicadSchematic } from './kicad/adapter'
+import { exportKicadProjectBundle } from './kicad/project'
 import {
   assignConnection,
   assignConnectionToChannel,
@@ -349,12 +350,12 @@ export default function App() {
 
   const exportKicad = () => {
     try {
-      const source = exportKicadSchematic(circuit)
-      downloadTextFile(`${safeFileStem(circuit.title)}.kicad_sch`, source, 'application/x-kicad-schematic')
+      const bundle = exportKicadProjectBundle(circuit)
+      downloadBinaryFile(bundle.filename, bundle.archive, 'application/zip')
       announce({
         kind: 'success',
-        title: 'KiCad schematic exported',
-        message: 'Flat schematic with embedded Saigen symbols and interchange metadata.',
+        title: 'KiCad project bundle exported',
+        message: 'Full multi-unit SSI symbols, assigned footprints, local libraries, project settings, and design notes.',
       })
     } catch (error) {
       announce({ kind: 'error', title: 'Export failed', message: error instanceof Error ? error.message : 'Unknown export error.' })
@@ -475,7 +476,7 @@ export default function App() {
         <div className="file-actions">
           <button className="icon-button" onClick={saveProject} aria-label="Save Saigen project" title="Save project"><Icon name="save" size={17} /></button>
           <button className="secondary-button" onClick={() => fileInputRef.current?.click()}><Icon name="upload" size={15} />Import</button>
-          <button className="primary-button" onClick={exportKicad}><Icon name="download" size={15} />Export KiCad</button>
+          <button className="primary-button" onClick={exportKicad}><Icon name="download" size={15} />Export KiCad bundle</button>
           <input
             ref={fileInputRef}
             type="file"

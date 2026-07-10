@@ -22,6 +22,17 @@ export function parseProject(source: string): CircuitDocument {
 
 export function downloadTextFile(filename: string, content: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType })
+  downloadBlob(filename, blob)
+}
+
+export function downloadBinaryFile(filename: string, content: Uint8Array, mimeType: string): void {
+  const bytes = new Uint8Array(content.byteLength)
+  bytes.set(content)
+  const blob = new Blob([bytes], { type: mimeType })
+  downloadBlob(filename, blob)
+}
+
+function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
